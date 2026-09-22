@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="fr-CA">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suivi de l'inertie thermique : Terre vs Mer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 24px; color: #2c3e50; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 28px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h2 { text-align: center; margin-top: 0; }
+        
+        .setup-box { background-color: #fef9e7; border: 2px solid #f39c12; padding: 18px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .setup-box input[type="text"] { padding: 8px 12px; font-size: 1.05em; border-radius: 4px; border: 2px solid #f39c12; width: 220px; margin-left: 8px; }
+        .date-badge { margin-top: 12px; font-weight: bold; font-size: 1.1em; color: #d35400; }
+        
+        /* Time Format Toggle Styles */
+        .toggle-group { margin-top: 15px; display: inline-flex; align-items: center; background: #fff; padding: 6px 14px; border-radius: 20px; border: 1px solid #f39c12; }
+        .toggle-group label { cursor: pointer; margin: 0 10px; font-weight: 600; font-size: 0.95em; color: #555; }
+        .toggle-group input[type="radio"] { margin-right: 5px; accent-color: #e67e22; }
+
+        .instructions { background-color: #e8f4f8; border-left: 5px solid #3498db; padding: 15px; border-radius: 6px; margin-bottom: 20px; line-height: 1.5; }
+        .link-buttons { display: flex; gap: 15px; margin-bottom: 25px; }
+        .earth-btn { flex: 1; padding: 12px; text-align: center; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; border: none; font-size: 0.95em; }
+        .btn-land { background-color: #27ae60; }
+        .btn-sea { background-color: #2980b9; }
+        .earth-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        
+        .table-wrapper { max-height: 340px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; text-align: center; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+        th { background-color: #f8fafc; position: sticky; top: 0; z-index: 10; }
+        input[type="number"] { width: 80px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
+        
+        .action-btn { width: 100%; padding: 14px; background-color: #e67e22; color: white; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; margin-bottom: 25px; }
+        .chart-container { position: relative; height: 380px; width: 100%; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🌡️ Suivi des températures : Terres vs Océan</h2>
+    
+    <!-- SETUP & REGION BOX -->
+    <div class="setup-box">
+        <div>
+            <label for="student-name"><strong>Entrez le prénom de l'élève :</strong></label>
+            <input type="text" id="student-name" placeholder="Écrivez le prénom ici..." oninput="initializeActivity()">
+        </div>
+
+        <div class="toggle-group">
+            <span style="color: #7f8c8d; margin-right: 6px;">Région / Horodatage :</span>
+            <label>
+                <input type="radio" name="time-offset" value="nl" checked onchange="handleTimeFormatChange()">
+                T.-N. Demie-heure (:30)
+            </label>
+            <label>
+                <input type="radio" name="time-offset" value="lab" onchange="handleTimeFormatChange()">
+                Labrador Heure pile (:00)
+            </label>
+        </div>
+
+        <div id="date-display" class="date-badge">⚠️ Entrez votre prénom ci-dessus pour générer votre date assignée!</div>
+    </div>
+
+    <div class="instructions">
+        <strong>Directives :</strong>
+        <ol>
+            <li>Entrez votre prénom dans la case ci-dessus pour générer votre date assignée.</li>
+            <li>Vérifiez que le sélecteur de région est bien réglé (<strong>T.-N. :30</strong> ou <strong>Labrador :00</strong>).</li>
+            <li>Cliquez sur les boutons ci-dessous pour ouvrir les cartes des terres et de l'océan dans des fenêtres séparées.</li>
+            <li>Utilisez les commandes <code>&lt;</code> et <code>&gt;</code> sur les cartes pour relever la température <strong>toutes les deux heures</strong>.</li>
+            <li>Inscrivez les températures dans le tableau ci-dessous, puis cliquez sur <strong>Générer le graphique comparatif</strong>.</li>
+        </ol>
+    </div>
+
+    <div class="link-buttons">
+        <button id="btn-land" class="earth-btn btn-land" disabled onclick="openMapWindow(landUrl, 'LandWindow')">
+            🌲 Ouvrir la fenêtre Terres (Centre de T.-N.)
+        </button>
+        <button id="btn-sea" class="earth-btn btn-sea" disabled onclick="openMapWindow(oceanUrl, 'OceanWindow')">
+            🌊 Ouvrir la fenêtre Océan (Atlantique)
+        </button>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Heure (locale)</th>
+                    <th>Temp. terres (°C)</th>
+                    <th>Temp. océan (°C)</th>
+                </tr>
+            </thead>
+            <tbody id="data-table-body"></tbody>
+        </table>
+    </div>
+
+    <button class="action-btn" onclick="updateChart()">📊 Générer le graphique comparatif</button>
+
+    <div class="chart-container">
+        <canvas id="tempChart"></canvas>
+    </div>
+</div>
+
+<script>
+    const curatedDates = [
+        "2023/06/26",
+        "2023/07/26",
+        "2025/07/07",
+        "2025/07/09",
+        "2025/07/31",
+        "2025/09/01",
+        "2025/09/02"
+    ];
+
+    // 2-hour intervals for both regions
+    const hoursHalf = ["00:30", "02:30", "04:30", "06:30", "08:30", "10:30", "12:30", "14:30", "16:30", "18:30", "20:30", "22:30"];
+    const hoursWhole = ["00:00", "02:00", "04:00", "06:00", "08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00"];
+
+    let landUrl = "";
+    let oceanUrl = "";
+    let assignedDateString = "";
+    const sessionSalt = Math.floor(Math.random() * 10000);
+
+    function getCurrentHoursList() {
+        const isLabrador = document.querySelector('input[name="time-offset"]:checked').value === "lab";
+        return isLabrador ? hoursWhole : hoursHalf;
+    }
+
+    function openMapWindow(url, windowName) {
+        window.open(url, windowName, 'width=950,height=750,resizable=yes,scrollbars=yes');
+    }
+
+    function updateMapUrls() {
+        if (!assignedDateString) return;
+        
+        // Use 0400Z for Labrador (on the hour) and 0330Z for Newfoundland (half-hour)
+        const isLabrador = document.querySelector('input[name="time-offset"]:checked').value === "lab";
+        const startTime = isLabrador ? "0400Z" : "0330Z";
+
+        landUrl = `https://earth.nullschool.net/#${assignedDateString}/${startTime}/wind/surface/level/overlay=temp/orthographic=-67.00,50.00,2000/loc=-56.47,48.69`;
+        oceanUrl = `https://earth.nullschool.net/#${assignedDateString}/${startTime}/wind/surface/level/overlay=temp/orthographic=-67.00,50.00,2000/loc=-50.00,47.00`;
+    }
+
+    function initializeActivity() {
+        const nameInput = document.getElementById("student-name").value.trim();
+        const btnLand = document.getElementById("btn-land");
+        const btnSea = document.getElementById("btn-sea");
+        const dateDisplay = document.getElementById("date-display");
+
+        if (nameInput.length === 0) {
+            btnLand.disabled = true;
+            btnSea.disabled = true;
+            dateDisplay.innerText = "⚠️ Entrez votre prénom ci-dessus pour générer votre date assignée!";
+            return;
+        }
+
+        let hash = 0;
+        const combinedSeed = nameInput.toLowerCase() + sessionSalt;
+        for (let i = 0; i < combinedSeed.length; i++) {
+            hash = combinedSeed.charCodeAt(i) + ((hash << 5) - hash);
+        }
+
+        const selectedIndex = Math.abs(hash) % curatedDates.length;
+        assignedDateString = curatedDates[selectedIndex];
+
+        dateDisplay.innerText = `Date assignée pour ${nameInput} : ${assignedDateString}`;
+
+        updateMapUrls();
+
+        btnLand.disabled = false;
+        btnSea.disabled = false;
+
+        updateChartTitle();
+    }
+
+    function renderTable() {
+        const tableBody = document.getElementById("data-table-body");
+        const hours = getCurrentHoursList();
+
+        // Preserve current values if the student toggles between formats
+        const landInputs = Array.from(document.querySelectorAll('.land-input')).map(input => input.value);
+        const oceanInputs = Array.from(document.querySelectorAll('.ocean-input')).map(input => input.value);
+
+        tableBody.innerHTML = "";
+
+        hours.forEach((hr, index) => {
+            const row = document.createElement("tr");
+            const landVal = landInputs[index] !== undefined ? landInputs[index] : "0.0";
+            const oceanVal = oceanInputs[index] !== undefined ? oceanInputs[index] : "0.0";
+
+            row.innerHTML = `
+                <td><strong>${hr}</strong></td>
+                <td><input type="number" class="land-input" value="${landVal}" step="0.1"></td>
+                <td><input type="number" class="ocean-input" value="${oceanVal}" step="0.1"></td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    function handleTimeFormatChange() {
+        renderTable();
+        updateMapUrls();
+
+        // Update Chart Labels to reflect current mode
+        tempChart.data.labels = getCurrentHoursList();
+        tempChart.update();
+    }
+
+    // Chart.js Setup
+    const ctx = document.getElementById('tempChart').getContext('2d');
+    const initialZeros = new Array(12).fill(0);
+
+    let tempChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: getCurrentHoursList(),
+            datasets: [
+                {
+                    label: 'Température des terres (°C)',
+                    data: initialZeros,
+                    borderColor: '#27ae60',
+                    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true
+                },
+                {
+                    label: 'Température de l\'océan (°C)',
+                    data: initialZeros,
+                    borderColor: '#2980b9',
+                    backgroundColor: 'rgba(41, 128, 185, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'Températures : Terres vs Océan', font: { size: 16 } }
+            },
+            scales: {
+                y: { title: { display: true, text: 'Température (°C)' } },
+                x: { title: { display: true, text: 'Heure de la journée (24 h)' } }
+            }
+        }
+    });
+
+    function updateChartTitle() {
+        const studentName = document.getElementById("student-name").value.trim() || "Élève";
+        tempChart.options.plugins.title.text = `Élève : ${studentName} | Date : ${assignedDateString}`;
+        tempChart.update();
+    }
+
+    function updateChart() {
+        const landInputs = document.querySelectorAll('.land-input');
+        const oceanInputs = document.querySelectorAll('.ocean-input');
+
+        const newLandData = Array.from(landInputs).map(input => parseFloat(input.value) || 0);
+        const newOceanData = Array.from(oceanInputs).map(input => parseFloat(input.value) || 0);
+
+        tempChart.data.datasets[0].data = newLandData;
+        tempChart.data.datasets[1].data = newOceanData;
+        
+        updateChartTitle();
+    }
+
+    // Initial render on load
+    renderTable();
+</script>
+
+</body>
+</html>
